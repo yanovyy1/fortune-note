@@ -1,0 +1,26 @@
+[
+  {
+    "id": "test-1",
+    "name": "Goldenreach",
+    "type": "kingdom",
+    "x": 640,
+    "y": 640,
+    "description": "A test marker at the center of the map."
+  },
+  {
+    "id": "test-2",
+    "name": "Ravenkeep",
+    "type": "castle",
+    "x": 300,
+    "y": 900,
+    "description": "A test marker on the first continent."
+  },
+  {
+    "id": "test-3",
+    "name": "Shattered Spire",
+    "type": "ruins",
+    "x": 1000,
+    "y": 300,
+    "description": "A test marker on another continent."
+  }
+]

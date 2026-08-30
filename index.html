@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fortune Note — Map of the World</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Manrope:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="splash">
+  <div class="splash-eyebrow">Explore &amp; Discover</div>
+  <div class="splash-title">Fortune Note</div>
+  <div class="splash-divider">
+    <span></span>
+    <svg width="10" height="10" viewBox="0 0 10 10"><path d="M0 0 L5 6 L10 0 Z" fill="currentColor"/></svg>
+    <span></span>
+  </div>
+  <button id="btn-begin" class="splash-btn">Begin Exploring</button>
+</div>
+
+<div id="map"></div>
+<div id="map-placeholder" class="map-placeholder">map file not loaded — place it in assets/map/ and set it in js/map-config.js</div>
+
+<div class="rail">
+  <div class="rail-logo">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M9 3 3 6v15l6-3 6 3 6-3V3l-6 3-6-3Z"/><path d="M9 3v15M15 6v15"/></svg>
+  </div>
+  <div class="rail-group">
+    <button class="rail-icon" id="btn-search" title="Search" aria-label="Search">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+    </button>
+    <button class="rail-icon" id="btn-layers" title="Layers" aria-label="Layers">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </button>
+  </div>
+  <div class="rail-spacer"></div>
+  <button class="rail-icon" id="btn-fullscreen" title="Fullscreen" aria-label="Fullscreen">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+  </button>
+</div>
+
+<div class="search-overlay" id="search-overlay">
+  <div class="search-box">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+    <input id="search-input" type="text" placeholder="Search locations…" autocomplete="off">
+  </div>
+  <div id="search-results" class="search-results"></div>
+</div>
+
+<div class="layers-panel" id="layers-panel">
+  <div class="title">Layers</div>
+  <div class="rows" id="layer-rows"></div>
+</div>
+
+<div class="zoom-controls">
+  <button id="zoom-in" aria-label="Zoom in">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
+  <button id="zoom-out" aria-label="Zoom out">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg>
+  </button>
+</div>
+
+<div class="status-bar">
+  <span id="status-coords">0, 0</span>
+  <span id="status-zoom">Z0</span>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/map-config.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
