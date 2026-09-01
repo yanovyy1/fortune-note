@@ -64,11 +64,17 @@ function markerHtml(loc, typeIcon) {
   `;
 }
 
+function toLatLng(loc) {
+  // data uses image/screen coordinates (0,0 = top-left, y grows downward);
+  // Leaflet's CRS.Simple grows lat upward, so y must be flipped against the map height.
+  return [MAP_CONFIG.height - loc.y, loc.x];
+}
+
 function renderLocations(locations) {
   locationsIndex = locations;
   locations.forEach((loc) => {
     const type = LAYER_TYPES.find((t) => t.key === loc.type);
-    const marker = L.marker([loc.y, loc.x], {
+    const marker = L.marker(toLatLng(loc), {
       icon: L.divIcon({
         className: '',
         html: markerHtml(loc, type && type.icon),
@@ -107,7 +113,7 @@ function initMap() {
 
 function updateStatusBar() {
   const c = window.map.getCenter();
-  document.getElementById('status-coords').textContent = `${Math.round(c.lng)}, ${Math.round(c.lat)}`;
+  document.getElementById('status-coords').textContent = `${Math.round(c.lng)}, ${Math.round(MAP_CONFIG.height - c.lat)}`;
   document.getElementById('status-zoom').textContent = `Z${window.map.getZoom()}`;
 }
 
@@ -140,7 +146,7 @@ function initSearch() {
           group.addTo(window.map);
           if (row) row.classList.add('active');
         }
-        window.map.setView([loc.y, loc.x], Math.max(window.map.getZoom(), 1));
+        window.map.setView(toLatLng(loc), Math.max(window.map.getZoom(), 1));
         markersById[loc.id].openPopup();
         results.innerHTML = '';
         input.value = '';
