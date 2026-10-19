@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'Geist Pixel';
+  src: url('../assets/fonts/GeistPixel-Square.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --bg-1: #14202c;
   --bg-2: #0a1119;
@@ -65,8 +73,8 @@ html, body {
 }
 #splash.hidden { opacity: 0; pointer-events: none; }
 .splash-eyebrow {
-  font-family: 'Geist', system-ui, sans-serif;
-  font-weight: 600;
+  font-family: 'Geist Pixel', 'Geist', system-ui, sans-serif;
+  font-weight: 400;
   font-size: 13px;
   letter-spacing: 4px;
   color: var(--accent);
@@ -74,8 +82,8 @@ html, body {
   margin-bottom: 14px;
 }
 .splash-title {
-  font-family: 'Geist', system-ui, sans-serif;
-  font-weight: 700;
+  font-family: 'Geist Pixel', 'Geist', system-ui, sans-serif;
+  font-weight: 400;
   font-size: 64px;
   letter-spacing: 6px;
   color: var(--ink);
@@ -214,8 +222,8 @@ html, body {
 .layers-panel.open { display: block; }
 .layers-panel .title {
   padding: 13px 16px 9px;
-  font-family: 'Geist', system-ui, sans-serif;
-  font-weight: 600;
+  font-family: 'Geist Pixel', 'Geist', system-ui, sans-serif;
+  font-weight: 400;
   font-size: 11px;
   letter-spacing: 2px;
   color: var(--accent);
@@ -311,8 +319,8 @@ html, body {
 }
 .loc-card h3 {
   margin: 0 0 8px;
-  font-family: 'Geist', system-ui, sans-serif;
-  font-weight: 600;
+  font-family: 'Geist Pixel', 'Geist', system-ui, sans-serif;
+  font-weight: 400;
   font-size: 18px;
   letter-spacing: 0.5px;
   color: var(--ink);
