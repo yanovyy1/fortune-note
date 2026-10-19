@@ -17,7 +17,7 @@ data/locations.json  — список локаций (см. схему ниже)
 ## Текущее состояние
 
 Карта уже заполнена: `assets/map/main_map.svg` (1280×1280) — три материка
-Fortune Note Universe, `data/locations.json` — 13 локаций канона
+Fortune Note Universe, `data/locations.json` — 22 локации канона
 (см. [fortune-note-universe.md](../Fortune%20Note%20Universe/fortune-note-universe.md)):
 
 - **Корпес** — округлый северный материк (столица + Железные горы).
