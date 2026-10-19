@@ -72,15 +72,6 @@ html, body {
   transition: opacity 0.5s ease;
 }
 #splash.hidden { opacity: 0; pointer-events: none; }
-.splash-eyebrow {
-  font-family: 'Geist Pixel', 'Geist', system-ui, sans-serif;
-  font-weight: 400;
-  font-size: 13px;
-  letter-spacing: 4px;
-  color: var(--accent);
-  text-transform: uppercase;
-  margin-bottom: 14px;
-}
 .splash-title {
   font-family: 'Geist Pixel', 'Geist', system-ui, sans-serif;
   font-weight: 400;
@@ -105,8 +96,8 @@ html, body {
   border: 1px solid var(--accent);
   background: transparent;
   padding: 15px 40px;
-  font-family: 'Geist', system-ui, sans-serif;
-  font-weight: 600;
+  font-family: 'Geist Pixel', 'Geist', system-ui, sans-serif;
+  font-weight: 400;
   font-size: 13px;
   letter-spacing: 2.5px;
   color: var(--ink);
