@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fortune Note — Map of the World</title>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:ital,wght@0,100..900;1,100..900&family=Geist+Mono:ital,wght@0,100..900;1,100..900&display=swap">
 <link rel="stylesheet" href="css/style.css">
 </head>
@@ -22,7 +21,12 @@
 </div>
 
 <div id="map"></div>
-<div id="map-placeholder" class="map-placeholder">map file not loaded — place it in assets/map/ and set it in js/map-config.js</div>
+<div id="markers" class="markers"></div>
+<div id="loc-popup" class="loc-popup" hidden>
+  <button class="loc-popup-close" aria-label="Close">&times;</button>
+  <div class="loc-popup-body"></div>
+</div>
+<div id="map-placeholder" class="map-placeholder" hidden>map failed to load — check assets/map/ and js/map-config.js</div>
 
 <div class="rail">
   <div class="rail-logo">
@@ -69,8 +73,15 @@
   <span id="status-zoom">Z0</span>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
 <script src="js/map-config.js"></script>
-<script src="js/app.js"></script>
+<script type="module" src="js/app.js"></script>
 </body>
 </html>

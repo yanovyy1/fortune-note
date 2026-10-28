@@ -51,7 +51,8 @@ html, body {
   background: rgba(195, 171, 126, 0.05);
 }
 
-.leaflet-container { background: transparent; font-family: inherit; }
+#map canvas { display: block; }
+[hidden] { display: none !important; }
 
 .hud {
   background: var(--panel-bg);
@@ -285,17 +286,33 @@ html, body {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
-/* leaflet popup override -> location card */
-.leaflet-popup-content-wrapper {
+/* location card, anchored above its marker by js/app.js */
+.loc-popup {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 998;
+  width: 270px;
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: 6px;
-  padding: 0;
   color: var(--ink);
+  max-height: 60vh;
+  overflow-y: auto;
 }
-.leaflet-popup-content { margin: 0; width: 270px !important; }
-.leaflet-popup-tip { background: var(--panel-bg); }
-.leaflet-container a.leaflet-popup-close-button { color: var(--ink-soft); }
+.loc-popup-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.loc-popup-close:hover { color: var(--ink); }
 
 .loc-card { padding: 16px; }
 .loc-card .badge {
@@ -323,7 +340,23 @@ html, body {
   color: var(--ink-soft);
 }
 
-/* map markers: gold-ring medallion + label */
+/* map markers: gold-ring medallion + label, positioned by js/app.js */
+.markers {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.marker {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 130px;
+  cursor: pointer;
+  pointer-events: auto;
+  will-change: transform;
+}
 .marker-wrap {
   display: flex;
   flex-direction: column;
@@ -343,7 +376,7 @@ html, body {
   box-shadow: 0 0 0 3px rgba(5, 8, 12, 0.6), 0 4px 10px rgba(0, 0, 0, 0.5);
   transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
-.leaflet-marker-icon:hover .marker-badge {
+.marker:hover .marker-badge {
   transform: scale(1.08);
   box-shadow: 0 0 0 3px rgba(5, 8, 12, 0.6), 0 0 16px rgba(195, 171, 126, 0.5);
 }
