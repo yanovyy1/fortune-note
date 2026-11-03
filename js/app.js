@@ -182,7 +182,7 @@ function buildTerrain(texture) {
       depthWrite: false,
     }),
   );
-  water.position.y = 0.001;
+  water.position.y = MAP_CONFIG.seaLevel * MAP_CONFIG.heightScale + 0.001;
   water.renderOrder = 1;
   scene.add(water);
 }

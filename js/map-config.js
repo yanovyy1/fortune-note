@@ -7,5 +7,7 @@ const MAP_CONFIG = {
   heightmap: 'assets/map/heightmap.bin',
   heightmapMeta: 'assets/map/heightmap.json',
   // Vertical exaggeration on top of the heights stored in the heightmap.
-  heightScale: 1.5,
+  heightScale: 1,
+  // Height of the water surface, in heightmap units (before heightScale).
+  seaLevel: -0.05,
 };
