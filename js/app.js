@@ -16,7 +16,6 @@ const MIN_DIST = 1.2;
 let maxDist = 15;
 const TILT_FAR = 0.3;
 const TILT_NEAR = 1.0;
-const SEA_COLOR = '#0f1c29';
 const WATER_COLOR = '#14263a';
 const FOG_COLOR = '#04070b';
 
@@ -71,7 +70,29 @@ function heightAt(wx, wz) {
 
 // ---------- scene ----------
 
-async function loadHeightmap() {
+async function loadMapImage() {
+  // the SVG is rasterized in the browser instead of shipping baked PNGs, so it stays the single source
+  const img = new Image();
+  img.src = MAP_CONFIG.src;
+  await img.decode();
+  return img;
+}
+
+function drawMap(img, size, filter = 'none', background = null) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (background) {
+    ctx.fillStyle = background;
+    ctx.fillRect(0, 0, size, size);
+  }
+  ctx.filter = filter;
+  ctx.drawImage(img, 0, 0, size, size);
+  return canvas;
+}
+
+async function loadHeightmap(img) {
   const [meta, buf] = await Promise.all([
     fetch(MAP_CONFIG.heightmapMeta).then((r) => r.json()),
     fetch(MAP_CONFIG.heightmap).then((r) => r.arrayBuffer()),
@@ -92,6 +113,18 @@ async function loadHeightmap() {
       const avg = (data[z0 * n + x0] + data[z0 * n + x1] + data[z1 * n + x0] + data[z1 * n + x1]) / 4;
       heights[z * size + x] = (meta.minHeight + (avg / 65535) * range) * MAP_CONFIG.heightScale;
     }
+  }
+
+  // the sculpt dips below the sea where the texture paints land (the basin in the east is open
+  // to the ocean through narrow channels, so it can't be told apart by flood fill): squeeze
+  // those heights into a thin band above the water, keeping their relative shape
+  const mask = drawMap(img, size).getContext('2d').getImageData(0, 0, size, size).data;
+  const sea = MAP_CONFIG.seaLevel * MAP_CONFIG.heightScale;
+  const floor = meta.minHeight * MAP_CONFIG.heightScale;
+  const band = 0.02 * MAP_CONFIG.heightScale;
+  for (let i = 0; i < heights.length; i++) {
+    if (mask[i * 4 + 3] < 128 || heights[i] >= sea + band) continue;
+    heights[i] = sea + band * (0.25 + 0.75 * (heights[i] - floor) / (sea + band - floor));
   }
   for (let pass = 0; pass < 2; pass++) {
     const out = new Float32Array(heights.length);
@@ -118,29 +151,192 @@ async function loadHeightmap() {
 }
 
 
-async function loadTexture() {
-  // the SVG is rasterized here instead of shipping a baked PNG, so it stays the single source
-  const img = new Image();
-  img.src = MAP_CONFIG.src;
-  await img.decode();
-
+function loadTextures(img) {
+  const toTexture = (canvas) => {
+    const texture = new THREE.CanvasTexture(canvas);
+    // the shader works on raw sRGB values
+    texture.colorSpace = THREE.NoColorSpace;
+    texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    return texture;
+  };
   const size = Math.min(4096, renderer.capabilities.maxTextureSize);
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  // the SVG sea is transparent: paint a sea floor under it
-  ctx.fillStyle = SEA_COLOR;
-  ctx.fillRect(0, 0, size, size);
-  ctx.drawImage(img, 0, 0, size, size);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  return texture;
+  return {
+    // only the regional colour of the painted map is kept, the relief comes from the mesh;
+    // land the SVG doesn't cover gets a neutral lowland colour
+    biome: toTexture(drawMap(img, 1024, 'blur(12px)', '#8a8b5c')),
+    detail: toTexture(drawMap(img, size)),
+    // land silhouette spread outwards: its alpha tells how close the sea is to a coast
+    coast: toTexture(drawMap(img, 512, 'blur(14px)')),
+  };
 }
 
-function buildTerrain(texture) {
+// radial alpha fade, so the square edges of the map dissolve into the page background;
+// it starts outside the outermost land
+function radialFade() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createRadialGradient(256, 256, 512 * 0.42, 256, 256, 512 * 0.5);
+  gradient.addColorStop(0, '#fff');
+  gradient.addColorStop(1, '#000');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 512, 512);
+  return new THREE.CanvasTexture(canvas);
+}
+
+const TERRAIN_VERTEX = /* glsl */ `
+  #include <fog_pars_vertex>
+  varying vec3 vPos;
+  varying vec3 vNormal;
+  varying vec2 vUv;
+  void main() {
+    vPos = position;
+    vNormal = normal;
+    vUv = uv;
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+    gl_Position = projectionMatrix * mvPosition;
+    #include <fog_vertex>
+  }
+`;
+
+// Stylized painted-map look: colour comes from height, slope and the blurred SVG (regional
+// tint), lit with exaggerated relief, warm light and cool shadows. Works in sRGB throughout.
+const TERRAIN_FRAGMENT = /* glsl */ `
+  #include <fog_pars_fragment>
+  uniform sampler2D uBiome;
+  uniform sampler2D uDetail;
+  uniform sampler2D uCoast;
+  uniform float uSea;
+  uniform float uPeak;
+  uniform float uRelief;
+  uniform vec3 uSun;
+  varying vec3 vPos;
+  varying vec3 vNormal;
+  varying vec2 vUv;
+
+  float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+               mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+  }
+  float fbm(vec2 p) {
+    float v = 0.0;
+    float a = 0.5;
+    for (int i = 0; i < 5; i++) {
+      v += a * noise(p);
+      p = p * 2.03 + 17.1;
+      a *= 0.5;
+    }
+    return v;
+  }
+
+  const vec3 FOREST = vec3(0.24, 0.33, 0.17);
+  const vec3 SAND = vec3(0.80, 0.72, 0.54);
+  const vec3 ROCK = vec3(0.47, 0.40, 0.34);
+  const vec3 ROCK_DARK = vec3(0.27, 0.22, 0.19);
+  const vec3 SNOW = vec3(0.91, 0.93, 0.95);
+  const vec3 SHALLOW = vec3(0.23, 0.44, 0.47);
+  const vec3 MID = vec3(0.10, 0.22, 0.29);
+  const vec3 DEEP = vec3(0.04, 0.08, 0.13);
+  const vec3 LAKE = vec3(0.22, 0.42, 0.50);
+
+  void main() {
+    vec2 p = vPos.xz;
+    float h = vPos.y;
+    vec3 n0 = normalize(vNormal);
+    float slope = length(n0.xz) / max(n0.y, 0.05);
+
+    // brush-scale wobble of the shading normal, stronger on rock
+    float e = 0.01;
+    float b0 = fbm(p * 9.0);
+    vec2 brush = vec2(fbm((p + vec2(e, 0.0)) * 9.0) - b0, fbm((p + vec2(0.0, e)) * 9.0) - b0) / e;
+    float rock = smoothstep(0.35, 0.9, slope + (b0 - 0.5) * 0.4);
+    vec3 n = normalize(vec3(n0.x * uRelief, n0.y, n0.z * uRelief) + vec3(brush.x, 0.0, brush.y) * (0.015 + 0.05 * rock));
+
+    float diff = dot(n, uSun);
+    vec3 light = mix(vec3(0.38, 0.42, 0.58), vec3(1.10, 1.02, 0.88), smoothstep(-0.15, 0.85, diff));
+
+    float above = h - uSea;
+    vec3 col;
+    if (above < 0.0) {
+      // the sea floor is nearly flat, so depth is read from the distance to the coast instead
+      float depth = -above;
+      float nearCoast = texture2D(uCoast, vUv).a + (fbm(p * 3.0) - 0.5) * 0.15;
+      col = mix(DEEP, MID, smoothstep(0.0, 0.35, nearCoast));
+      col = mix(col, SHALLOW, 0.75 * smoothstep(0.4, 0.85, nearCoast) * smoothstep(0.03, 0.0, depth));
+      col *= mix(vec3(0.75, 0.8, 0.9), vec3(1.05), smoothstep(-0.2, 0.9, diff));
+      // surf along the coast
+      float foam = smoothstep(0.006, 0.0, depth) * smoothstep(0.35, 0.65, fbm(p * 40.0));
+      col = mix(col, vec3(0.62, 0.74, 0.74), foam * 0.6);
+    } else {
+      vec3 biome = texture2D(uBiome, vUv).rgb;
+      // pull the painted tint towards a richer, slightly darker palette
+      float grey = dot(biome, vec3(0.333));
+      vec3 base = mix(vec3(grey), biome, 1.5);
+      float variation = fbm(p * 14.0);
+      base *= 0.82 + 0.36 * variation;
+      // forest patches where the land is green
+      float green = smoothstep(0.0, 0.06, biome.g - max(biome.r, biome.b) * 0.92);
+      float forest = smoothstep(0.5, 0.62, fbm(p * 5.0 + 3.7)) * green * (1.0 - rock);
+      base = mix(base, FOREST * (0.85 + 0.3 * variation), forest * 0.75);
+
+      float beach = 1.0 - smoothstep(0.002, 0.008, above + (variation - 0.5) * 0.006);
+      base = mix(base, SAND, beach * (1.0 - rock) * 0.8);
+
+      float strata = fbm(p * 7.0 + h * 25.0);
+      vec3 rockCol = mix(ROCK_DARK, ROCK, smoothstep(0.25, 0.75, strata));
+      col = mix(base, rockCol, rock);
+
+      float snow = smoothstep(uPeak * 0.4, uPeak * 0.6, h + (b0 - 0.5) * uPeak * 0.3) * (1.0 - rock * 0.5);
+      col = mix(col, SNOW, snow);
+
+      // lakes and rivers painted in the SVG
+      vec4 detail = texture2D(uDetail, vUv);
+      float lake = smoothstep(0.05, 0.14, detail.b - max(detail.r, detail.g)) * detail.a;
+      col = mix(col, LAKE * (0.9 + 0.2 * variation), lake);
+
+      col *= light;
+      // ridges catch a little extra light
+      col += vec3(1.0, 0.9, 0.75) * pow(max(diff, 0.0), 6.0) * 0.12 * smoothstep(0.2, 0.6, slope);
+    }
+
+    float fade = 1.0 - smoothstep(0.42, 0.5, length(vUv - 0.5));
+    gl_FragColor = vec4(col, fade);
+    #include <fog_fragment>
+  }
+`;
+
+function terrainMaterial(textures) {
+  const material = new THREE.ShaderMaterial({
+    vertexShader: TERRAIN_VERTEX,
+    fragmentShader: TERRAIN_FRAGMENT,
+    transparent: true,
+    fog: true,
+    uniforms: THREE.UniformsUtils.merge([
+      THREE.UniformsLib.fog,
+      {
+        uBiome: { value: null },
+        uDetail: { value: null },
+        uCoast: { value: null },
+        uSea: { value: MAP_CONFIG.seaLevel * MAP_CONFIG.heightScale },
+        uPeak: { value: heightmap.heights.reduce((a, b) => Math.max(a, b)) },
+        uRelief: { value: 3.0 },
+        uSun: { value: new THREE.Vector3(-0.55, 0.7, -0.45).normalize() },
+      },
+    ]),
+  });
+  // set after the merge, which would clone the textures
+  material.uniforms.uBiome.value = textures.biome;
+  material.uniforms.uDetail.value = textures.detail;
+  material.uniforms.uCoast.value = textures.coast;
+  return material;
+}
+
+function buildTerrain(textures) {
   const { size, worldSize } = heightmap;
   // PlaneGeometry rows run from z = -ws/2 after the rotation, matching the heightmap row order
   const geometry = new THREE.PlaneGeometry(worldSize, worldSize, size - 1, size - 1);
@@ -151,32 +347,17 @@ function buildTerrain(texture) {
   }
   geometry.computeVertexNormals();
 
-  // radial alpha fade, so the square edges of the map dissolve into the page background;
-  // it starts outside the outermost land
-  const fadeCanvas = document.createElement('canvas');
-  fadeCanvas.width = 512;
-  fadeCanvas.height = 512;
-  const fctx = fadeCanvas.getContext('2d');
-  const fadeGradient = fctx.createRadialGradient(256, 256, 512 * 0.42, 256, 256, 512 * 0.5);
-  fadeGradient.addColorStop(0, '#fff');
-  fadeGradient.addColorStop(1, '#000');
-  fctx.fillStyle = fadeGradient;
-  fctx.fillRect(0, 0, 512, 512);
-  const fade = new THREE.CanvasTexture(fadeCanvas);
-
-  const terrain = new THREE.Mesh(
-    geometry,
-    new THREE.MeshLambertMaterial({ map: texture, alphaMap: fade, transparent: true }),
-  );
+  const terrain = new THREE.Mesh(geometry, terrainMaterial(textures));
   scene.add(terrain);
 
   const water = new THREE.Mesh(
     new THREE.PlaneGeometry(worldSize, worldSize).rotateX(-Math.PI / 2),
     new THREE.MeshStandardMaterial({
       color: WATER_COLOR,
-      alphaMap: fade,
+      alphaMap: radialFade(),
       transparent: true,
-      opacity: 0.8,
+      // the terrain shader paints the shallows and the deep sea, the water only adds sheen
+      opacity: 0.2,
       roughness: 0.4,
       metalness: 0.15,
       depthWrite: false,
@@ -501,8 +682,9 @@ async function main() {
   initScene();
 
   try {
-    await loadHeightmap();
-    buildTerrain(await loadTexture());
+    const img = await loadMapImage();
+    await loadHeightmap(img);
+    buildTerrain(loadTextures(img));
   } catch (err) {
     console.error(err);
     document.getElementById('map-placeholder').hidden = false;
