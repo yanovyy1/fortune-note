@@ -1,14 +1,22 @@
 import * as THREE from 'three';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 
+// icons: Phosphor (fill), viewBox 0 0 256 256
 const LAYER_TYPES = [
-  { key: 'kingdom', label: 'Kingdoms', icon: '<path d="M4 21V10l3-3 3 3v11M12 21V6l3-3 3 3v15M4 10h6M12 6h8"/>' },
-  { key: 'castle', label: 'Castles', icon: '<path d="M4 21V11l3-2v3l3-2v3l3-2v3l3-2v9Z"/><path d="M4 21h16"/>' },
-  { key: 'ruins', label: 'Ruins', icon: '<path d="M3 21h18M6 21V9l6-5 6 5v12" stroke-dasharray="2 2"/>' },
-  { key: 'settlement', label: 'Settlements', icon: '<path d="M12 21V9M8 13l4-4 4 4M9 17l3-3 3 3"/>' },
-  { key: 'water', label: 'Water', icon: '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z"/>' },
-  { key: 'place', label: 'Places', icon: '<path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/><circle cx="12" cy="10" r="2.5"/>' },
+  { key: 'kingdom', label: 'Королевства', one: 'Королевство', icon: 'M248,80a28,28,0,1,0-51.12,15.77l-26.79,33L146,73.4a28,28,0,1,0-36.06,0L85.91,128.74l-26.79-33a28,28,0,1,0-26.6,12L47,194.63A16,16,0,0,0,62.78,208H193.22A16,16,0,0,0,209,194.63l14.47-86.85A28,28,0,0,0,248,80ZM128,40a12,12,0,1,1-12,12A12,12,0,0,1,128,40ZM24,80A12,12,0,1,1,36,92,12,12,0,0,1,24,80ZM220,92a12,12,0,1,1,12-12A12,12,0,0,1,220,92Z' },
+  { key: 'castle', label: 'Замки', one: 'Замок', icon: 'M216,216H200V115.31L211.31,104A15.86,15.86,0,0,0,216,92.69V48a16,16,0,0,0-16-16H180a8,8,0,0,0-8,8V64H148V40a8,8,0,0,0-8-8H116a8,8,0,0,0-8,8V64H84V40a8,8,0,0,0-8-8H56A16,16,0,0,0,40,48V92.69A15.86,15.86,0,0,0,44.69,104L56,115.31V216H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16ZM112,168a16,16,0,0,1,32,0v48H112Z' },
+  { key: 'ruins', label: 'Руины', one: 'Руины', icon: 'M120,48V208a16,16,0,0,1-16,16H64a16,16,0,0,1-16-16V48A16,16,0,0,1,64,32h40A16,16,0,0,1,120,48Zm72-16H152a16,16,0,0,0-16,16V208a16,16,0,0,0,16,16h40a16,16,0,0,0,16-16V48A16,16,0,0,0,192,32Z' },
+  { key: 'settlement', label: 'Поселения', one: 'Поселение', icon: 'M240,208H224V136l2.34,2.34A8,8,0,0,0,237.66,127L139.31,28.68a16,16,0,0,0-22.62,0L18.34,127a8,8,0,0,0,11.32,11.31L32,136v72H16a8,8,0,0,0,0,16H240a8,8,0,0,0,0-16Zm-88,0H104V160a4,4,0,0,1,4-4h40a4,4,0,0,1,4,4Z' },
+  { key: 'water', label: 'Водоёмы', one: 'Водоём', icon: 'M174,47.75a254.19,254.19,0,0,0-41.45-38.3,8,8,0,0,0-9.18,0A254.19,254.19,0,0,0,82,47.75C54.51,79.32,40,112.6,40,144a88,88,0,0,0,176,0C216,112.6,201.49,79.32,174,47.75Zm9.85,105.59a57.6,57.6,0,0,1-46.56,46.55A8.75,8.75,0,0,1,136,200a8,8,0,0,1-1.32-15.89c16.57-2.79,30.63-16.85,33.44-33.45a8,8,0,0,1,15.78,2.68Z' },
+  { key: 'place', label: 'Места', one: 'Место', icon: 'M128,16a88.1,88.1,0,0,0-88,88c0,75.3,80,132.17,83.41,134.55a8,8,0,0,0,9.18,0C136,236.17,216,179.3,216,104A88.1,88.1,0,0,0,128,16Zm0,56a32,32,0,1,1-32,32A32,32,0,0,1,128,72Z' },
 ];
+
+// which marker keeps its place when two collide
+const PRIORITY = { kingdom: 0, castle: 1, settlement: 2, ruins: 3, place: 4, water: 5 };
+const LABEL_GAP = 6;
+const LABEL_HEIGHT = 13;
+
+const mobileQuery = window.matchMedia('(max-width: 720px)');
 
 // camera: distance range and tilt (angle from straight down) at each end of it;
 // the far end is fitted to the viewport so narrow screens can see all continents
@@ -31,8 +39,16 @@ let scene;
 let camera;
 let controls;
 
-function iconSvg(inner, size = 14) {
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${inner}</svg>`;
+function iconSvg(d, size = 14) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="${d}"/></svg>`;
+}
+
+function typeOf(key) {
+  return LAYER_TYPES.find((t) => t.key === key);
+}
+
+function markerSize() {
+  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--marker-size')) || 38;
 }
 
 // ---------- coordinates ----------
@@ -411,6 +427,7 @@ function initScene() {
     renderer.setSize(container.clientWidth, container.clientHeight);
     maxDist = fitDistance() * 1.15;
     controls.maxDistance = maxDist;
+    measureLabels();
   });
 
   // a click (not a drag) on empty map closes the card
@@ -422,11 +439,12 @@ function initScene() {
   });
 }
 
-// distance at which the land (roughly 8.2 × 8.4 world units, plus room for the icon rail)
-// fits the viewport
+// distance at which the land (roughly 8.2 × 8.4 world units, plus room for the icon rail
+// on the left; on phones the rail is a pill at the bottom) fits the viewport
 function fitDistance() {
   const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-  return Math.max(4.2 / tanHalf, 4.8 / (tanHalf * camera.aspect));
+  const halfWidth = mobileQuery.matches ? 4.3 : 4.8;
+  return Math.max(4.2 / tanHalf, halfWidth / (tanHalf * camera.aspect));
 }
 
 function cameraDistance() {
@@ -475,16 +493,17 @@ function stepTween(now) {
 // ---------- markers & popup ----------
 
 function popupHtml(loc) {
-  const typeLabel = (LAYER_TYPES.find((t) => t.key === loc.type) || {}).label || loc.type;
+  const type = typeOf(loc.type);
   const meta = [];
-  if (loc.region) meta.push(`<div><b>Region:</b> ${loc.region}</div>`);
-  if (loc.era) meta.push(`<div><b>Era:</b> ${loc.era}</div>`);
+  // the region is worth a line only when it isn't the place itself
+  if (loc.region && loc.region !== loc.name) meta.push(`<div><dt>Регион</dt><dd>${loc.region}</dd></div>`);
+  if (loc.era) meta.push(`<div><dt>Эпоха</dt><dd>${loc.era}</dd></div>`);
   return `
     <div class="loc-card">
-      <span class="badge">${typeLabel}</span>
+      <span class="badge">${type ? type.one : loc.type}</span>
       <h3>${loc.name}</h3>
       <p>${loc.description || ''}</p>
-      ${meta.length ? `<p style="margin-top:8px;">${meta.join(' ')}</p>` : ''}
+      ${meta.length ? `<dl class="loc-meta">${meta.join('')}</dl>` : ''}
     </div>
   `;
 }
@@ -498,7 +517,24 @@ function markerHtml(loc, typeIcon) {
   `;
 }
 
+function isOpen(id) {
+  return document.getElementById(id).classList.contains('open');
+}
+
+// on phones the card is a sheet above the bottom pill: bring the place into the free upper part
+function focusMarker(entry, dist = cameraDistance()) {
+  let z = entry.world.z;
+  if (mobileQuery.matches) {
+    const h = renderer.domElement.clientHeight;
+    const worldPerPx = (2 * dist * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) / h;
+    z += 0.22 * h * worldPerPx;
+  }
+  flyTo(entry.world.x, z, dist);
+}
+
 function showPopup(entry) {
+  // one floating surface at a time: the card replaces search, and on phones the layers sheet too
+  if (isOpen('search-overlay') || (mobileQuery.matches && isOpen('layers-panel'))) setPanel(null);
   openPopup = entry;
   const popup = document.getElementById('loc-popup');
   popup.querySelector('.loc-popup-body').innerHTML = popupHtml(entry.loc);
@@ -522,11 +558,25 @@ function renderLocations(locations) {
     const entry = { loc, el, world: new THREE.Vector3(wx, Math.max(heightAt(wx, wz), 0), wz) };
     el.addEventListener('click', (e) => {
       e.stopPropagation();
+      if (mobileQuery.matches) focusMarker(entry);
       showPopup(entry);
     });
     container.appendChild(el);
     markers.push(entry);
   });
+  measureLabels();
+  document.fonts.ready.then(measureLabels);
+}
+
+function measureLabels() {
+  markers.forEach((m) => {
+    const w = m.el.querySelector('.marker-label').offsetWidth;
+    if (w) m.labelWidth = w;
+  });
+}
+
+function overlaps(a, b, pad) {
+  return a.l < b.r + pad && b.l < a.r + pad && a.t < b.b + pad && b.t < a.b + pad;
 }
 
 const projected = new THREE.Vector3();
@@ -534,16 +584,44 @@ const projected = new THREE.Vector3();
 function updateOverlays() {
   const w = renderer.domElement.clientWidth;
   const h = renderer.domElement.clientHeight;
+  const size = markerSize();
+  const r = size / 2;
 
+  const shown = [];
   markers.forEach((m) => {
     projected.copy(m.world).project(camera);
-    const visible = !hiddenTypes.has(m.loc.type) && projected.z < 1;
-    m.el.style.display = visible ? '' : 'none';
-    if (!visible) return;
-    const x = (projected.x + 1) / 2 * w;
-    const y = (1 - projected.y) / 2 * h;
-    m.el.style.transform = `translate(${x - 65}px, ${y - 19}px)`;
-    m.el.style.zIndex = String(Math.round((1 - projected.z) * 1e6));
+    if (hiddenTypes.has(m.loc.type) || projected.z >= 1) {
+      m.el.style.display = 'none';
+      return;
+    }
+    shown.push({ m, x: (projected.x + 1) / 2 * w, y: (1 - projected.y) / 2 * h, z: projected.z });
+  });
+
+  // the open card's marker first, then the more important places; a marker that would
+  // sit on one already placed waits until the map is zoomed in far enough
+  shown.sort((a, b) => (b.m === openPopup) - (a.m === openPopup)
+    || PRIORITY[a.m.loc.type] - PRIORITY[b.m.loc.type]);
+  const badges = [];
+  const placed = shown.filter((s) => {
+    const box = { l: s.x - r, r: s.x + r, t: s.y - r, b: s.y + r };
+    const free = s.m === openPopup || !badges.some((o) => overlaps(box, o, 2));
+    s.m.el.style.display = free ? '' : 'none';
+    if (free) badges.push(box);
+    return free;
+  });
+
+  // labels go in the same order and never cover a badge or another label
+  const taken = [...badges];
+  placed.forEach(({ m, x, y, z }) => {
+    const lw = m.labelWidth || 0;
+    const top = y + r + LABEL_GAP;
+    const box = { l: x - lw / 2, r: x + lw / 2, t: top, b: top + LABEL_HEIGHT };
+    const inside = box.l >= 4 && box.r <= w - 4;
+    const free = inside && !taken.some((o) => overlaps(box, o, 4));
+    m.el.classList.toggle('no-label', !free);
+    if (free) taken.push(box);
+    m.el.style.transform = `translate(${x - 65}px, ${y - r}px)`;
+    m.el.style.zIndex = String(Math.round((1 - z) * 1e6));
   });
 
   if (openPopup) {
@@ -552,21 +630,35 @@ function updateOverlays() {
       closePopup();
       return;
     }
+    // on phones the card is a bottom sheet laid out by CSS
+    if (mobileQuery.matches) {
+      popup.style.transform = '';
+      return;
+    }
     projected.copy(openPopup.world).project(camera);
     const x = (projected.x + 1) / 2 * w;
     const y = (1 - projected.y) / 2 * h;
     const pw = popup.offsetWidth;
     const ph = popup.offsetHeight;
-    const left = THREE.MathUtils.clamp(x - pw / 2, 8, Math.max(8, w - pw - 8));
-    const top = Math.max(8, y - 28 - ph);
+    const railRight = document.querySelector('.rail').getBoundingClientRect().right;
+
+    // above the marker, else under its label, else wherever covers it least
+    const above = y - r - 10 - ph;
+    const below = y + r + LABEL_GAP + LABEL_HEIGHT + 10;
+    let top;
+    if (above >= 8) top = above;
+    else if (below + ph <= h - 8) top = below;
+    else top = y - 8 > h - y ? Math.max(8, above) : Math.min(below, h - 8 - ph);
+
+    let left = THREE.MathUtils.clamp(x - pw / 2, railRight + 8, Math.max(railRight + 8, w - pw - 8));
+    // step past the layers panel rather than sit on it
+    if (isOpen('layers-panel')) {
+      const pr = document.getElementById('layers-panel').getBoundingClientRect();
+      const panel = { l: pr.left, r: pr.right, t: pr.top, b: pr.bottom };
+      if (overlaps({ l: left, r: left + pw, t: top, b: top + ph }, panel, 8)) left = panel.r + 12;
+    }
     popup.style.transform = `translate(${left}px, ${top}px)`;
   }
-}
-
-function updateStatusBar() {
-  const [x, y] = toMapXY(controls.target.x, controls.target.z);
-  document.getElementById('status-coords').textContent = `${Math.round(x)}, ${Math.round(y)}`;
-  document.getElementById('status-zoom').textContent = `Z${Math.log2(maxDist / cameraDistance()).toFixed(1)}`;
 }
 
 function animate(now) {
@@ -575,7 +667,6 @@ function animate(now) {
   constrainCamera();
   renderer.render(scene, camera);
   updateOverlays();
-  updateStatusBar();
   requestAnimationFrame(animate);
 }
 
@@ -588,7 +679,7 @@ function buildLayerRows() {
     row.className = 'layer-row active';
     row.dataset.key = t.key;
     row.innerHTML = `
-      <div class="swatch">${iconSvg(t.icon, 12)}</div>
+      <div class="swatch">${iconSvg(t.icon, 14)}</div>
       <span class="label">${t.label}</span>
     `;
     row.addEventListener('click', () => {
@@ -601,6 +692,8 @@ function buildLayerRows() {
 }
 
 function setPanel(panel) {
+  // search lands on the card's spot, and on phones every panel shares the bottom with it
+  if (panel === 'search' || (panel && mobileQuery.matches)) closePopup();
   document.getElementById('search-overlay').classList.toggle('open', panel === 'search');
   document.getElementById('layers-panel').classList.toggle('open', panel === 'layers');
   document.getElementById('btn-search').classList.toggle('active', panel === 'search');
@@ -618,7 +711,7 @@ function initSearch() {
     if (!q) return;
     const matches = locationsIndex.filter((l) => l.name.toLowerCase().includes(q)).slice(0, 8);
     matches.forEach((loc) => {
-      const typeLabel = (LAYER_TYPES.find((t) => t.key === loc.type) || {}).label || loc.type;
+      const typeLabel = (typeOf(loc.type) || {}).one || loc.type;
       const item = document.createElement('div');
       item.className = 'search-result-item';
       item.innerHTML = `${loc.name}<span class="type">${typeLabel}</span>`;
@@ -629,11 +722,11 @@ function initSearch() {
           if (row) row.classList.add('active');
         }
         const entry = markers.find((m) => m.loc.id === loc.id);
-        flyTo(entry.world.x, entry.world.z, Math.min(cameraDistance(), 4));
-        showPopup(entry);
         results.innerHTML = '';
         input.value = '';
         setPanel(null);
+        focusMarker(entry, Math.min(cameraDistance(), 4));
+        showPopup(entry);
       });
       results.appendChild(item);
     });
@@ -671,7 +764,7 @@ function initControls() {
   });
   document.querySelector('.loc-popup-close').addEventListener('click', closePopup);
 
-  setPanel('layers');
+  setPanel(mobileQuery.matches ? null : 'layers');
 }
 
 async function main() {
