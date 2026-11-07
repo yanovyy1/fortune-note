@@ -1,14 +1,14 @@
 import * as THREE from 'three';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 
-// icons: Phosphor (fill), viewBox 0 0 256 256
+// icons: brandbook line set, 24 × 24 grid, 1.5 stroke, square-cut ends
 const LAYER_TYPES = [
-  { key: 'kingdom', label: 'Королевства', one: 'Королевство', icon: 'M248,80a28,28,0,1,0-51.12,15.77l-26.79,33L146,73.4a28,28,0,1,0-36.06,0L85.91,128.74l-26.79-33a28,28,0,1,0-26.6,12L47,194.63A16,16,0,0,0,62.78,208H193.22A16,16,0,0,0,209,194.63l14.47-86.85A28,28,0,0,0,248,80ZM128,40a12,12,0,1,1-12,12A12,12,0,0,1,128,40ZM24,80A12,12,0,1,1,36,92,12,12,0,0,1,24,80ZM220,92a12,12,0,1,1,12-12A12,12,0,0,1,220,92Z' },
-  { key: 'castle', label: 'Замки', one: 'Замок', icon: 'M216,216H200V115.31L211.31,104A15.86,15.86,0,0,0,216,92.69V48a16,16,0,0,0-16-16H180a8,8,0,0,0-8,8V64H148V40a8,8,0,0,0-8-8H116a8,8,0,0,0-8,8V64H84V40a8,8,0,0,0-8-8H56A16,16,0,0,0,40,48V92.69A15.86,15.86,0,0,0,44.69,104L56,115.31V216H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16ZM112,168a16,16,0,0,1,32,0v48H112Z' },
-  { key: 'ruins', label: 'Руины', one: 'Руины', icon: 'M120,48V208a16,16,0,0,1-16,16H64a16,16,0,0,1-16-16V48A16,16,0,0,1,64,32h40A16,16,0,0,1,120,48Zm72-16H152a16,16,0,0,0-16,16V208a16,16,0,0,0,16,16h40a16,16,0,0,0,16-16V48A16,16,0,0,0,192,32Z' },
-  { key: 'settlement', label: 'Поселения', one: 'Поселение', icon: 'M240,208H224V136l2.34,2.34A8,8,0,0,0,237.66,127L139.31,28.68a16,16,0,0,0-22.62,0L18.34,127a8,8,0,0,0,11.32,11.31L32,136v72H16a8,8,0,0,0,0,16H240a8,8,0,0,0,0-16Zm-88,0H104V160a4,4,0,0,1,4-4h40a4,4,0,0,1,4,4Z' },
-  { key: 'water', label: 'Водоёмы', one: 'Водоём', icon: 'M174,47.75a254.19,254.19,0,0,0-41.45-38.3,8,8,0,0,0-9.18,0A254.19,254.19,0,0,0,82,47.75C54.51,79.32,40,112.6,40,144a88,88,0,0,0,176,0C216,112.6,201.49,79.32,174,47.75Zm9.85,105.59a57.6,57.6,0,0,1-46.56,46.55A8.75,8.75,0,0,1,136,200a8,8,0,0,1-1.32-15.89c16.57-2.79,30.63-16.85,33.44-33.45a8,8,0,0,1,15.78,2.68Z' },
-  { key: 'place', label: 'Места', one: 'Место', icon: 'M128,16a88.1,88.1,0,0,0-88,88c0,75.3,80,132.17,83.41,134.55a8,8,0,0,0,9.18,0C136,236.17,216,179.3,216,104A88.1,88.1,0,0,0,128,16Zm0,56a32,32,0,1,1-32,32A32,32,0,0,1,128,72Z' },
+  { key: 'kingdom', label: 'Королевства', one: 'Королевство', icon: 'M3 7l4.5 5L12 5l4.5 7L21 7l-2 12H5z' },
+  { key: 'castle', label: 'Замки', one: 'Замок', icon: 'M4 21V4h3v3h3V4h4v3h3V4h3v17zM10 21v-5a2 2 0 0 1 4 0v5' },
+  { key: 'ruins', label: 'Руины', one: 'Руины', icon: 'M5 21V6l2-2 2 1v16M15 21V9l2-2 2 2v12M3 21h18' },
+  { key: 'settlement', label: 'Поселения', one: 'Поселение', icon: 'M3 11l9-7 9 7M5 9.5V20h14V9.5M10 20v-6h4v6' },
+  { key: 'water', label: 'Водоёмы', one: 'Водоём', icon: 'M12 3c4 5 6.5 8.5 6.5 12a6.5 6.5 0 0 1-13 0C5.5 11.5 8 8 12 3z' },
+  { key: 'place', label: 'Места', one: 'Место', icon: 'M12 21s-7-6-7-11.5a7 7 0 0 1 14 0C19 15 12 21 12 21zM14.5 9.5a2.5 2.5 0 1 1-5 0a2.5 2.5 0 1 1 5 0z' },
 ];
 
 // which marker keeps its place when two collide
@@ -25,7 +25,7 @@ let maxDist = 15;
 const TILT_FAR = 0.3;
 const TILT_NEAR = 1.0;
 const WATER_COLOR = '#14263a';
-const FOG_COLOR = '#04070b';
+const FOG_COLOR = '#0f0505'; // brandbook bg-3
 
 const hiddenTypes = new Set();
 const markers = []; // { loc, el, world: Vector3 }
@@ -40,7 +40,7 @@ let camera;
 let controls;
 
 function iconSvg(d, size = 14) {
-  return `<svg width="${size}" height="${size}" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="${d}"/></svg>`;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" stroke-linejoin="miter" aria-hidden="true"><path d="${d}"/></svg>`;
 }
 
 function typeOf(key) {
@@ -48,7 +48,7 @@ function typeOf(key) {
 }
 
 function markerSize() {
-  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--marker-size')) || 38;
+  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--marker-size')) || 40;
 }
 
 // ---------- coordinates ----------
@@ -511,7 +511,7 @@ function popupHtml(loc) {
 function markerHtml(loc, typeIcon) {
   return `
     <div class="marker-wrap">
-      <div class="marker-badge">${iconSvg(typeIcon || '', 16)}</div>
+      <div class="marker-badge">${iconSvg(typeIcon || '', 20)}</div>
       <div class="marker-label">${loc.name}</div>
     </div>
   `;
@@ -679,8 +679,9 @@ function buildLayerRows() {
     row.className = 'layer-row active';
     row.dataset.key = t.key;
     row.innerHTML = `
-      <div class="swatch">${iconSvg(t.icon, 14)}</div>
+      <div class="swatch">${iconSvg(t.icon, 18)}</div>
       <span class="label">${t.label}</span>
+      <span class="switch" aria-hidden="true"></span>
     `;
     row.addEventListener('click', () => {
       const active = row.classList.toggle('active');
