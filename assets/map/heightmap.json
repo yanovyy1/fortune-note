@@ -1,6 +1,6 @@
 {
-  "size": 512,
+  "size": 1024,
   "worldSize": 10,
-  "minHeight": -0.12929973,
-  "maxHeight": 0.34928972
+  "minHeight": -0.07212,
+  "maxHeight": 0.30987
 }

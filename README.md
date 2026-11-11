@@ -38,7 +38,7 @@ Fortune Note Universe, `data/locations.json` — 22 локации канона
 размер сетки (по умолчанию 512):
 
 ```bash
-node tools/obj2heightmap.mjs ~/Downloads/FN.obj 512
+node tools/obj2heightmap.mjs ~/Downloads/FN_detailed.obj 1024
 ```
 
 Цвет рельефа рисует шейдер (`TERRAIN_FRAGMENT` в `js/app.js`) в стиле

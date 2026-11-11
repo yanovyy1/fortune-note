@@ -117,15 +117,17 @@ async function loadHeightmap(img) {
   const n = meta.size;
   const range = meta.maxHeight - meta.minHeight;
 
-  // upsample 2× and smooth, so the coastlines don't show the source grid as stair steps
-  const size = n * 2 - 1;
+  // coarse bakes get upsampled 2× and smoothed, so the coastlines don't show the source grid
+  // as stair steps; detailed ones (≥1024²) are used as-is to keep the sculpted detail
+  const up = n < 1024 ? 2 : 1;
+  const size = (n - 1) * up + 1;
   let heights = new Float32Array(size * size);
   for (let z = 0; z < size; z++) {
     for (let x = 0; x < size; x++) {
-      const x0 = x >> 1;
-      const z0 = z >> 1;
-      const x1 = Math.min(x0 + (x & 1), n - 1);
-      const z1 = Math.min(z0 + (z & 1), n - 1);
+      const x0 = Math.floor(x / up);
+      const z0 = Math.floor(z / up);
+      const x1 = Math.min(x0 + (x % up), n - 1);
+      const z1 = Math.min(z0 + (z % up), n - 1);
       const avg = (data[z0 * n + x0] + data[z0 * n + x1] + data[z1 * n + x0] + data[z1 * n + x1]) / 4;
       heights[z * size + x] = (meta.minHeight + (avg / 65535) * range) * MAP_CONFIG.heightScale;
     }
@@ -142,7 +144,7 @@ async function loadHeightmap(img) {
     if (mask[i * 4 + 3] < 128 || heights[i] >= sea + band) continue;
     heights[i] = sea + band * (0.25 + 0.75 * (heights[i] - floor) / (sea + band - floor));
   }
-  for (let pass = 0; pass < 2; pass++) {
+  for (let pass = 0; pass < up; pass++) {
     const out = new Float32Array(heights.length);
     for (let z = 0; z < size; z++) {
       for (let x = 0; x < size; x++) {
