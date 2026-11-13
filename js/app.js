@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createMapControls } from './map-controls.js';
+import { createMapControls } from './map-controls.js?v=20261114'; // bump ?v= with index.html so phones drop cached files
 
 // icons: brandbook line set, 24 × 24 grid, 1.5 stroke, square-cut ends
 const LAYER_TYPES = [
@@ -786,7 +786,7 @@ async function main() {
     return;
   }
 
-  const locations = await fetch('data/locations.json')
+  const locations = await fetch('data/locations.json', { cache: 'no-cache' })
     .then((res) => res.json())
     .catch(() => []);
   renderLocations(locations);
