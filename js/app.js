@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createMapControls } from './map-controls.js?v=20261114b'; // bump ?v= with index.html so phones drop cached files
+import { createMapControls } from './map-controls.js?v=20261114c'; // bump ?v= with index.html so phones drop cached files
 
 // icons: brandbook line set, 24 × 24 grid, 1.5 stroke, square-cut ends
 const LAYER_TYPES = [
@@ -26,7 +26,7 @@ const MIN_DIST = 1.2;
 let maxDist = 15;
 const TILT_FAR = 0.3;
 const TILT_NEAR = 1.0;
-const WATER_COLOR = '#14263a';
+const WATER_COLOR = '#21303f'; // brandbook bg-1
 const FOG_COLOR = '#0f0505'; // brandbook bg-3
 
 const hiddenTypes = new Set();
@@ -221,7 +221,9 @@ const TERRAIN_VERTEX = /* glsl */ `
 `;
 
 // Stylized painted-map look: colour comes from height, slope and the blurred SVG (regional
-// tint), lit with exaggerated relief, warm light and cool shadows. Works in sRGB throughout.
+// tint), lit with exaggerated relief. The palette is graded to the brandbook: muted, cool land,
+// a sea that runs from bg-1 at the coast into the dark page, ink for snow, foam and highlights.
+// Works in sRGB throughout.
 const TERRAIN_FRAGMENT = /* glsl */ `
   #include <fog_pars_fragment>
   uniform sampler2D uBiome;
@@ -254,15 +256,17 @@ const TERRAIN_FRAGMENT = /* glsl */ `
     return v;
   }
 
-  const vec3 FOREST = vec3(0.24, 0.33, 0.17);
-  const vec3 SAND = vec3(0.80, 0.72, 0.54);
-  const vec3 ROCK = vec3(0.47, 0.40, 0.34);
-  const vec3 ROCK_DARK = vec3(0.27, 0.22, 0.19);
-  const vec3 SNOW = vec3(0.91, 0.93, 0.95);
-  const vec3 SHALLOW = vec3(0.23, 0.44, 0.47);
-  const vec3 MID = vec3(0.10, 0.22, 0.29);
-  const vec3 DEEP = vec3(0.04, 0.08, 0.13);
-  const vec3 LAKE = vec3(0.22, 0.42, 0.50);
+  const vec3 FOREST = vec3(0.16, 0.24, 0.21);
+  const vec3 SAND = vec3(0.60, 0.62, 0.58);
+  const vec3 ROCK = vec3(0.40, 0.43, 0.46);
+  const vec3 ROCK_DARK = vec3(0.16, 0.16, 0.19);
+  const vec3 SNOW = vec3(0.83, 0.93, 0.93); // ink
+  const vec3 SHALLOW = vec3(0.21, 0.32, 0.38);
+  const vec3 MID = vec3(0.11, 0.16, 0.22); // towards bg-1
+  const vec3 DEEP = vec3(0.07, 0.06, 0.08); // towards bg-2
+  const vec3 LAKE = vec3(0.17, 0.28, 0.35);
+  const vec3 LAND_TINT = vec3(0.86, 0.95, 0.97); // cools the painted colours
+  const float LAND_SATURATION = 0.5;
 
   void main() {
     vec2 p = vPos.xz;
@@ -278,7 +282,7 @@ const TERRAIN_FRAGMENT = /* glsl */ `
     vec3 n = normalize(vec3(n0.x * uRelief, n0.y, n0.z * uRelief) + vec3(brush.x, 0.0, brush.y) * (0.015 + 0.05 * rock));
 
     float diff = dot(n, uSun);
-    vec3 light = mix(vec3(0.38, 0.42, 0.58), vec3(1.10, 1.02, 0.88), smoothstep(-0.15, 0.85, diff));
+    vec3 light = mix(vec3(0.30, 0.36, 0.50), vec3(1.04, 1.04, 1.00), smoothstep(-0.15, 0.85, diff));
 
     float above = h - uSea;
     vec3 col;
@@ -291,12 +295,12 @@ const TERRAIN_FRAGMENT = /* glsl */ `
       col *= mix(vec3(0.75, 0.8, 0.9), vec3(1.05), smoothstep(-0.2, 0.9, diff));
       // surf along the coast
       float foam = smoothstep(0.006, 0.0, depth) * smoothstep(0.35, 0.65, fbm(p * 40.0));
-      col = mix(col, vec3(0.62, 0.74, 0.74), foam * 0.6);
+      col = mix(col, vec3(0.71, 0.78, 0.80), foam * 0.5);
     } else {
       vec3 biome = texture2D(uBiome, vUv).rgb;
-      // pull the painted tint towards a richer, slightly darker palette
+      // mute the painted tint and cool it, so regions still differ but sit in the palette
       float grey = dot(biome, vec3(0.333));
-      vec3 base = mix(vec3(grey), biome, 1.5);
+      vec3 base = mix(vec3(grey), biome, LAND_SATURATION) * LAND_TINT * 0.85;
       float variation = fbm(p * 14.0);
       base *= 0.82 + 0.36 * variation;
       // forest patches where the land is green
@@ -321,7 +325,7 @@ const TERRAIN_FRAGMENT = /* glsl */ `
 
       col *= light;
       // ridges catch a little extra light
-      col += vec3(1.0, 0.9, 0.75) * pow(max(diff, 0.0), 6.0) * 0.12 * smoothstep(0.2, 0.6, slope);
+      col += vec3(0.83, 0.93, 0.93) * pow(max(diff, 0.0), 6.0) * 0.12 * smoothstep(0.2, 0.6, slope);
     }
 
     float fade = 1.0 - smoothstep(0.42, 0.5, length(vUv - 0.5));
