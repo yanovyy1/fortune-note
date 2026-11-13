@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createMapControls } from './map-controls.js?v=20261114'; // bump ?v= with index.html so phones drop cached files
+import { createMapControls } from './map-controls.js?v=20261114b'; // bump ?v= with index.html so phones drop cached files
 
 // icons: brandbook line set, 24 × 24 grid, 1.5 stroke, square-cut ends
 const LAYER_TYPES = [
@@ -13,6 +13,10 @@ const LAYER_TYPES = [
 const PRIORITY = { capital: 0, city: 1, ruins: 2, poi: 3 };
 const LABEL_GAP = 6;
 const LABEL_HEIGHT = 13;
+// markers and labels fade and scale in or out over FADE_TIME; a label waits LABEL_DELAY
+// with room to spare before it shows, so it doesn't flicker while the map moves
+const FADE_TIME = 0.28;
+const LABEL_DELAY = 0.15;
 
 const mobileQuery = window.matchMedia('(max-width: 720px)');
 
@@ -409,6 +413,7 @@ function initScene() {
   controls = createMapControls({
     camera,
     dom: renderer.domElement,
+    surfaces: [renderer.domElement, document.getElementById('markers')],
     place: placeCamera,
     minDist: MIN_DIST,
     maxDist: () => maxDist,
@@ -545,9 +550,21 @@ function renderLocations(locations) {
     el.className = 'marker';
     el.innerHTML = markerHtml(loc, type && type.icon);
     const [wx, wz] = toWorldXZ(loc.x, loc.y);
-    const entry = { loc, el, world: new THREE.Vector3(wx, Math.max(heightAt(wx, wz), 0), wz) };
+    const entry = {
+      loc,
+      el,
+      badge: el.querySelector('.marker-badge'),
+      label: el.querySelector('.marker-label'),
+      world: new THREE.Vector3(wx, Math.max(heightAt(wx, wz), 0), wz),
+      badgeFade: 0,
+      labelFade: 0,
+      labelFreeFor: 0,
+    };
+    // a drag or pinch that starts on the marker moves the map, it doesn't open the card
+    el.addEventListener('pointerdown', (e) => { entry.down = [e.clientX, e.clientY]; });
     el.addEventListener('click', (e) => {
       e.stopPropagation();
+      if (entry.down && Math.hypot(e.clientX - entry.down[0], e.clientY - entry.down[1]) > 6) return;
       if (mobileQuery.matches) focusMarker(entry);
       showPopup(entry);
     });
@@ -571,7 +588,28 @@ function overlaps(a, b, pad) {
 
 const projected = new THREE.Vector3();
 
-function updateOverlays() {
+function smoothstep(t) {
+  return t * t * (3 - 2 * t);
+}
+
+// step a marker's fades towards whether its badge and label should be visible
+function stepFades(m, badgeOn, labelOn, dt) {
+  const step = dt / FADE_TIME;
+  m.labelFreeFor = labelOn ? m.labelFreeFor + dt : 0;
+  const labelWanted = badgeOn && labelOn && m.labelFreeFor >= LABEL_DELAY;
+  m.badgeFade = THREE.MathUtils.clamp(m.badgeFade + (badgeOn ? step : -step), 0, 1);
+  m.labelFade = THREE.MathUtils.clamp(m.labelFade + (labelWanted ? step : -step), 0, 1);
+
+  const b = smoothstep(m.badgeFade);
+  const l = smoothstep(m.labelFade);
+  m.badge.style.opacity = b.toFixed(3);
+  m.badge.style.setProperty('--fade-scale', (0.5 + 0.5 * b).toFixed(3));
+  m.label.style.opacity = l.toFixed(3);
+  m.label.style.transform = `scale(${(0.85 + 0.15 * l).toFixed(3)})`;
+  m.el.classList.toggle('is-hidden', !badgeOn);
+}
+
+function updateOverlays(dt) {
   const w = renderer.domElement.clientWidth;
   const h = renderer.domElement.clientHeight;
   const size = markerSize();
@@ -585,9 +623,9 @@ function updateOverlays() {
   const shown = [];
   markers.forEach((m) => {
     projected.copy(m.world).project(camera);
-    // hidden markers stay in the DOM and fade out in place (see .marker.is-hidden)
+    // hidden markers stay in the DOM and fade out in place
     if (hiddenTypes.has(m.loc.type) || projected.z >= 1) {
-      m.el.classList.add('is-hidden');
+      stepFades(m, false, false, dt);
       return;
     }
     shown.push({ m, x: (projected.x + 1) / 2 * w, y: (1 - projected.y) / 2 * h, z: projected.z });
@@ -601,9 +639,11 @@ function updateOverlays() {
   const placed = shown.filter((s) => {
     const box = { l: s.x - r, r: s.x + r, t: s.y - r, b: s.y + r };
     const free = s.m === openPopup || !badges.some((o) => overlaps(box, o, 2));
-    s.m.el.classList.toggle('is-hidden', !free);
     if (free) badges.push(box);
-    else placeAt(s);
+    else {
+      stepFades(s.m, false, false, dt);
+      placeAt(s);
+    }
     return free;
   });
 
@@ -615,7 +655,7 @@ function updateOverlays() {
     const box = { l: x - lw / 2, r: x + lw / 2, t: top, b: top + LABEL_HEIGHT };
     const inside = box.l >= 4 && box.r <= w - 4;
     const free = inside && !taken.some((o) => overlaps(box, o, 4));
-    m.el.classList.toggle('no-label', !free);
+    stepFades(m, true, free, dt);
     if (free) taken.push(box);
     placeAt({ m, x, y, z });
   });
@@ -667,7 +707,7 @@ function animate(now) {
   scene.fog.near = cameraDistance() * 1.1;
   scene.fog.far = cameraDistance() * 2.6;
   renderer.render(scene, camera);
-  updateOverlays();
+  updateOverlays(dt);
   requestAnimationFrame(animate);
 }
 

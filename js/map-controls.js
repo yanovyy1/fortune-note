@@ -7,11 +7,12 @@ import * as THREE from 'three';
 const FOLLOW_RATE = 9; // how fast the view follows a drag, pinch or trackpad scroll, 1/s
 const ZOOM_RATE = 6; // how fast the view catches up with a mouse-wheel zoom, 1/s
 const GLIDE_RATE = 2.2; // how fast a released drag comes to rest, 1/s
+const PINCH_RATE = 22; // a touch pinch stays close under the fingers, 1/s
 const MOUSE_WHEEL_SPEED = 0.0014;
 const PINCH_WHEEL_SPEED = 0.01;
 const TRACKPAD_IDLE_MS = 400;
 
-export function createMapControls({ camera, dom, place, minDist, maxDist, bounds, onStart }) {
+export function createMapControls({ camera, dom, surfaces = [dom], place, minDist, maxDist, bounds, onStart }) {
   const view = { target: new THREE.Vector3(), dist: 1 };
   const goal = { target: new THREE.Vector3(), dist: 1 };
   let targetRate = FOLLOW_RATE;
@@ -82,19 +83,22 @@ export function createMapControls({ camera, dom, place, minDist, maxDist, bounds
   }
   let pinch = null;
 
-  dom.addEventListener('pointerdown', (e) => {
+  // gestures start on the canvas or on a marker above it (a pinch often lands on one);
+  // moves and releases are followed on the window, so no pointer capture steals the
+  // marker's click
+  function onDown(e) {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    try { dom.setPointerCapture(e.pointerId); } catch { /* synthetic or already gone */ }
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     onStart();
     // grab the map where it is now: stop a glide still running
     if (targetRate === GLIDE_RATE) goal.target.copy(view.target);
-    follow(FOLLOW_RATE);
+    follow(pointers.size === 2 ? PINCH_RATE : FOLLOW_RATE);
     samples = [];
     pinch = pointers.size === 2 ? midpoint() : null;
-  });
+  }
+  surfaces.forEach((el) => el && el.addEventListener('pointerdown', onDown));
 
-  dom.addEventListener('pointermove', (e) => {
+  window.addEventListener('pointermove', (e) => {
     const p = pointers.get(e.pointerId);
     if (!p) return;
     const prev = { x: p.x, y: p.y };
@@ -113,6 +117,7 @@ export function createMapControls({ camera, dom, place, minDist, maxDist, bounds
       if (next.spread > 0) zoomAt(goal, pinch.spread / next.spread, pinch.x, pinch.y);
       const d = panBetween(goal, pinch.x, pinch.y, next.x, next.y);
       if (d) moveGoal(d);
+      follow(PINCH_RATE);
       pinch = next;
     }
   });
@@ -123,6 +128,7 @@ export function createMapControls({ camera, dom, place, minDist, maxDist, bounds
       // lifting one finger of a pinch: carry on dragging with the other, no glide yet
       samples = [];
       pinch = null;
+      follow(FOLLOW_RATE);
       return;
     }
     pinch = pointers.size === 2 ? midpoint() : null;
@@ -142,8 +148,8 @@ export function createMapControls({ camera, dom, place, minDist, maxDist, bounds
     }
     samples = [];
   }
-  dom.addEventListener('pointerup', release);
-  dom.addEventListener('pointercancel', release);
+  window.addEventListener('pointerup', release);
+  window.addEventListener('pointercancel', release);
 
   // ---------- wheel: mouse wheel zooms, trackpad scroll pans, trackpad pinch zooms ----------
 
@@ -186,9 +192,7 @@ export function createMapControls({ camera, dom, place, minDist, maxDist, bounds
       follow(ZOOM_RATE);
     }
   }
-  // markers and labels sit above the canvas: let the wheel over them steer the map too
-  const wheelTargets = [dom, document.getElementById('markers')];
-  wheelTargets.forEach((el) => el && el.addEventListener('wheel', onWheel, { passive: false }));
+  surfaces.forEach((el) => el && el.addEventListener('wheel', onWheel, { passive: false }));
 
   // Safari on macOS reports trackpad pinches as gesture events instead of ctrl + wheel
   let gestureScale = 1;
@@ -208,7 +212,7 @@ export function createMapControls({ camera, dom, place, minDist, maxDist, bounds
   });
   document.addEventListener('gestureend', (e) => e.preventDefault());
 
-  dom.style.touchAction = 'none';
+  surfaces.forEach((el) => { if (el) el.style.touchAction = 'none'; });
 
   return {
     view,
