@@ -1,18 +1,16 @@
 import * as THREE from 'three';
-import { MapControls } from 'three/addons/controls/MapControls.js';
+import { createMapControls } from './map-controls.js';
 
 // icons: brandbook line set, 24 × 24 grid, 1.5 stroke, square-cut ends
 const LAYER_TYPES = [
-  { key: 'kingdom', label: 'Королевства', one: 'Королевство', icon: 'M3 7l4.5 5L12 5l4.5 7L21 7l-2 12H5z' },
-  { key: 'castle', label: 'Замки', one: 'Замок', icon: 'M4 21V4h3v3h3V4h4v3h3V4h3v17zM10 21v-5a2 2 0 0 1 4 0v5' },
+  { key: 'capital', label: 'Столицы', one: 'Столица', icon: 'M3 7l4.5 5L12 5l4.5 7L21 7l-2 12H5z' },
   { key: 'ruins', label: 'Руины', one: 'Руины', icon: 'M5 21V6l2-2 2 1v16M15 21V9l2-2 2 2v12M3 21h18' },
-  { key: 'settlement', label: 'Поселения', one: 'Поселение', icon: 'M3 11l9-7 9 7M5 9.5V20h14V9.5M10 20v-6h4v6' },
-  { key: 'water', label: 'Водоёмы', one: 'Водоём', icon: 'M12 3c4 5 6.5 8.5 6.5 12a6.5 6.5 0 0 1-13 0C5.5 11.5 8 8 12 3z' },
-  { key: 'place', label: 'Места', one: 'Место', icon: 'M12 21s-7-6-7-11.5a7 7 0 0 1 14 0C19 15 12 21 12 21zM14.5 9.5a2.5 2.5 0 1 1-5 0a2.5 2.5 0 1 1 5 0z' },
+  { key: 'city', label: 'Города', one: 'Город', icon: 'M3 11l9-7 9 7M5 9.5V20h14V9.5M10 20v-6h4v6' },
+  { key: 'poi', label: 'Точки интереса', one: 'Точка интереса', icon: 'M12 21s-7-6-7-11.5a7 7 0 0 1 14 0C19 15 12 21 12 21zM14.5 9.5a2.5 2.5 0 1 1-5 0a2.5 2.5 0 1 1 5 0z' },
 ];
 
 // which marker keeps its place when two collide
-const PRIORITY = { kingdom: 0, castle: 1, settlement: 2, ruins: 3, place: 4, water: 5 };
+const PRIORITY = { capital: 0, city: 1, ruins: 2, poi: 3 };
 const LABEL_GAP = 6;
 const LABEL_HEIGHT = 13;
 
@@ -408,27 +406,26 @@ function initScene() {
   sun.position.set(-4, 6, -3);
   scene.add(sun);
 
-  controls = new MapControls(camera, renderer.domElement);
-  controls.enableRotate = false;
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.12;
-  controls.minDistance = MIN_DIST;
-  controls.zoomToCursor = true;
+  controls = createMapControls({
+    camera,
+    dom: renderer.domElement,
+    place: placeCamera,
+    minDist: MIN_DIST,
+    maxDist: () => maxDist,
+    bounds: () => (heightmap ? heightmap.worldSize : 10) / 2,
+    onStart: () => { tween = null; },
+  });
 
   const startDist = fitDistance();
   maxDist = startDist * 1.15;
-  controls.maxDistance = maxDist;
-  const tilt = tiltFor(startDist);
-  camera.position.set(0, Math.cos(tilt) * startDist, Math.sin(tilt) * startDist);
-  controls.target.set(0, 0, 0);
-  controls.update();
+  controls.jump(new THREE.Vector3(0, 0, 0), startDist);
+  controls.update(0);
 
   window.addEventListener('resize', () => {
     camera.aspect = container.clientWidth / container.clientHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(container.clientWidth, container.clientHeight);
     maxDist = fitDistance() * 1.15;
-    controls.maxDistance = maxDist;
     measureLabels();
   });
 
@@ -450,29 +447,20 @@ function fitDistance() {
 }
 
 function cameraDistance() {
-  return camera.position.distanceTo(controls.target);
+  return controls.view.dist;
 }
 
-// keep the camera at the zoom-dependent tilt, looking north, with the target on the map
-function constrainCamera() {
-  const half = heightmap.worldSize / 2;
-  const t = controls.target;
-  const clampedX = THREE.MathUtils.clamp(t.x, -half, half);
-  const clampedZ = THREE.MathUtils.clamp(t.z, -half, half);
-  t.set(clampedX, 0, clampedZ);
-
-  const dist = cameraDistance();
+// the camera sits at the zoom-dependent tilt, looking north at the target
+function placeCamera(cam, target, dist) {
   const tilt = tiltFor(dist);
-  camera.position.set(t.x, Math.cos(tilt) * dist, t.z + Math.sin(tilt) * dist);
-  camera.lookAt(t);
-
-  scene.fog.near = dist * 1.1;
-  scene.fog.far = dist * 2.6;
+  cam.position.set(target.x, Math.cos(tilt) * dist, target.z + Math.sin(tilt) * dist);
+  cam.lookAt(target);
+  cam.updateMatrixWorld();
 }
 
 function flyTo(wx, wz, dist, duration = 700) {
   tween = {
-    fromTarget: controls.target.clone(),
+    fromTarget: controls.view.target.clone(),
     toTarget: new THREE.Vector3(wx, 0, wz),
     fromDist: cameraDistance(),
     toDist: THREE.MathUtils.clamp(dist, MIN_DIST, maxDist),
@@ -485,10 +473,10 @@ function stepTween(now) {
   if (!tween) return;
   const k = Math.min((now - tween.start) / tween.duration, 1);
   const e = 1 - Math.pow(1 - k, 3);
-  controls.target.lerpVectors(tween.fromTarget, tween.toTarget, e);
-  const dist = THREE.MathUtils.lerp(tween.fromDist, tween.toDist, e);
-  const dir = camera.position.clone().sub(controls.target).normalize();
-  camera.position.copy(controls.target).addScaledVector(dir, dist);
+  controls.jump(
+    new THREE.Vector3().lerpVectors(tween.fromTarget, tween.toTarget, e),
+    THREE.MathUtils.lerp(tween.fromDist, tween.toDist, e),
+  );
   if (k === 1) tween = null;
 }
 
@@ -589,11 +577,17 @@ function updateOverlays() {
   const size = markerSize();
   const r = size / 2;
 
+  function placeAt({ m, x, y, z }) {
+    m.el.style.transform = `translate(${x - 65}px, ${y - r}px)`;
+    m.el.style.zIndex = String(Math.round((1 - z) * 1e6));
+  }
+
   const shown = [];
   markers.forEach((m) => {
     projected.copy(m.world).project(camera);
+    // hidden markers stay in the DOM and fade out in place (see .marker.is-hidden)
     if (hiddenTypes.has(m.loc.type) || projected.z >= 1) {
-      m.el.style.display = 'none';
+      m.el.classList.add('is-hidden');
       return;
     }
     shown.push({ m, x: (projected.x + 1) / 2 * w, y: (1 - projected.y) / 2 * h, z: projected.z });
@@ -607,8 +601,9 @@ function updateOverlays() {
   const placed = shown.filter((s) => {
     const box = { l: s.x - r, r: s.x + r, t: s.y - r, b: s.y + r };
     const free = s.m === openPopup || !badges.some((o) => overlaps(box, o, 2));
-    s.m.el.style.display = free ? '' : 'none';
+    s.m.el.classList.toggle('is-hidden', !free);
     if (free) badges.push(box);
+    else placeAt(s);
     return free;
   });
 
@@ -622,8 +617,7 @@ function updateOverlays() {
     const free = inside && !taken.some((o) => overlaps(box, o, 4));
     m.el.classList.toggle('no-label', !free);
     if (free) taken.push(box);
-    m.el.style.transform = `translate(${x - 65}px, ${y - r}px)`;
-    m.el.style.zIndex = String(Math.round((1 - z) * 1e6));
+    placeAt({ m, x, y, z });
   });
 
   if (openPopup) {
@@ -663,10 +657,15 @@ function updateOverlays() {
   }
 }
 
+let lastFrame = 0;
+
 function animate(now) {
+  const dt = lastFrame ? Math.min((now - lastFrame) / 1000, 0.1) : 0;
+  lastFrame = now;
   stepTween(now);
-  controls.update();
-  constrainCamera();
+  controls.update(dt);
+  scene.fog.near = cameraDistance() * 1.1;
+  scene.fog.far = cameraDistance() * 2.6;
   renderer.render(scene, camera);
   updateOverlays();
   requestAnimationFrame(animate);
@@ -749,7 +748,7 @@ function initSplash() {
 }
 
 function initControls() {
-  const zoomBy = (factor) => flyTo(controls.target.x, controls.target.z, cameraDistance() * factor, 300);
+  const zoomBy = (factor) => flyTo(controls.view.target.x, controls.view.target.z, cameraDistance() * factor, 300);
   document.getElementById('zoom-in').addEventListener('click', () => zoomBy(0.6));
   document.getElementById('zoom-out').addEventListener('click', () => zoomBy(1 / 0.6));
 

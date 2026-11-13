@@ -77,7 +77,7 @@ const MAP_CONFIG = {
 {
   "id": "unique-id",
   "name": "Название локации",
-  "type": "kingdom | castle | ruins | settlement | water | place",
+  "type": "capital | city | ruins | poi",
   "x": 700,
   "y": 600,
   "region": "необязательно — название региона",

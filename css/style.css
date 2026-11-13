@@ -24,12 +24,12 @@
   --badge-fill: var(--bg-2);
 
   /* rarity */
-  --rarity-common: #9aa0a6;
-  --rarity-uncommon: #5fb374;
-  --rarity-rare: #4f8ee0;
-  --rarity-very-rare: #9a73e0;
-  --rarity-legendary: #e0a03a;
-  --rarity-mythic: #e0524a;
+  --rarity-common: #ababab;
+  --rarity-uncommon: #c4547b;
+  --rarity-rare: #c748bc;
+  --rarity-very-rare: #8c75ff;
+  --rarity-legendary: #1ab2ff;
+  --rarity-mythic: #4ce1c3;
 
   /* type: Geist Pixel for headings and accents, Geist 400 for text, Geist Mono for captions */
   --font-display: 'Geist Pixel', 'Geist', system-ui, sans-serif;
@@ -500,7 +500,7 @@ html, body {
   justify-content: center;
   color: var(--accent);
   box-shadow: 0 0 0 3px rgba(15, 5, 5, 0.6), 0 4px 12px rgba(0, 0, 0, 0.5);
-  transition: box-shadow 0.15s ease, transform 0.15s ease, color 0.15s ease;
+  transition: box-shadow 0.15s ease, color 0.15s ease, opacity 0.25s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.3, 1.2);
 }
 .marker:hover .marker-badge {
   transform: scale(1.08);
@@ -517,8 +517,14 @@ html, body {
   text-transform: uppercase;
   text-shadow: 0 1px 2px var(--bg-3), 0 2px 8px rgba(0, 0, 0, 0.9);
   white-space: nowrap;
+  transform-origin: 50% 0;
+  transition: opacity 0.25s ease, transform 0.25s ease;
 }
-.marker.no-label .marker-label { visibility: hidden; }
+/* appear / disappear: fade and scale instead of popping */
+.marker.is-hidden { pointer-events: none; }
+.marker.is-hidden .marker-badge { opacity: 0; transform: scale(0.5); }
+.marker.is-hidden .marker-label,
+.marker.no-label .marker-label { opacity: 0; transform: scale(0.85); }
 
 /* phones: the rail becomes a pill at the bottom, panels and the card become sheets above it */
 @media (max-width: 720px) {
